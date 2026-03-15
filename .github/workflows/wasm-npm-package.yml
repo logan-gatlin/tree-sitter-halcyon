@@ -1,0 +1,50 @@
+name: Build Wasm NPM Package
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - stable
+
+permissions:
+  contents: write
+
+jobs:
+  wasm-npm-package:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build tree-sitter wasm grammar
+        run: npm run build:wasm
+
+      - name: Create npm tarball
+        run: |
+          TARBALL_NAME=$(npm pack | tail -n 1)
+          cp "$TARBALL_NAME" tree-sitter-halcyon.tgz
+
+      - name: Upload npm tarball
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-sitter-halcyon-npm-tarball
+          path: tree-sitter-halcyon.tgz
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: stable-${{ github.sha }}
+          name: Stable NPM Package (${{ github.sha }})
+          body: |
+            Automated npm-compatible wasm package built from the latest commit on `stable`.
+            Commit: `${{ github.sha }}`
+          files: tree-sitter-halcyon.tgz

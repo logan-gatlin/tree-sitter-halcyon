@@ -50,6 +50,7 @@
   },
   "scripts": {
     "install": "node-gyp-build",
+    "build:wasm": "tree-sitter build --wasm",
     "prestart": "tree-sitter build --wasm",
     "start": "tree-sitter playground",
     "test": "node --test bindings/node/*_test.js"

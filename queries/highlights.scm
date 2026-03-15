@@ -1,5 +1,6 @@
 [
   "module"
+  "bundle"
   "import"
   "use"
   "as"
@@ -73,6 +74,9 @@
 (boolean_literal) @boolean
 
 (module
+  name: (identifier) @namespace)
+
+(bundle_declaration
   name: (identifier) @namespace)
 
 (use_statement

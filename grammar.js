@@ -22,6 +22,7 @@ const PREC = {
   TYPE_APPLY: 2,
   TYPE_ARROW: 1,
   PATTERN_ANNOTATION: 1,
+  CONSTRUCTOR_PATTERN: 2,
 };
 
 export default grammar({
@@ -48,8 +49,14 @@ export default grammar({
     source_file: $ => repeat($.top_level_item),
 
     top_level_item: $ => choice(
+      $.bundle_declaration,
       $.import_statement,
-      $.module,
+      $.statement,
+    ),
+
+    bundle_declaration: $ => seq(
+      "bundle",
+      field("name", $.identifier),
     ),
 
     import_statement: $ => seq(
@@ -81,20 +88,38 @@ export default grammar({
       optional(seq("as", field("alias", $.identifier))),
     ),
 
-    let_statement: $ => seq(
-      "let",
-      field("pattern", $.pattern),
-      "=",
-      field("value", $.expression),
+    let_statement: $ => choice(
+      seq(
+        "let",
+        "|",
+        field("name", $.identifier),
+        "=",
+        field("value", choice($.identifier, $.path)),
+      ),
+      seq(
+        "let",
+        field("pattern", $.pattern),
+        "=",
+        field("value", $.expression),
+      ),
     ),
 
-    type_statement: $ => seq(
-      "type",
-      optional("~"),
-      field("name", $.identifier),
-      optional($.type_parameter_list),
-      "=",
-      field("body", $.type_definition),
+    type_statement: $ => choice(
+      seq(
+        "type",
+        "~",
+        field("name", $.identifier),
+        optional($.type_parameter_list),
+        "=",
+        field("body", $.type_alias_definition),
+      ),
+      seq(
+        "type",
+        field("name", $.identifier),
+        optional($.type_parameter_list),
+        "=",
+        field("body", $.type_definition),
+      ),
     ),
 
     type_parameter_list: $ => seq(
@@ -110,10 +135,11 @@ export default grammar({
 
     record_type_definition: $ => seq(
       "{",
-      commaSep1($.field_type),
-      optional(","),
+      repeat1(seq(choice($.field_type, $.spread_type), optional(","))),
       "}",
     ),
+
+    spread_type: $ => seq("..", field("type", $.type_expression)),
 
     field_type: $ => seq(
       field("name", $.identifier),
@@ -123,29 +149,29 @@ export default grammar({
 
     sum_type_definition: $ => repeat1($.variant),
 
-    variant: $ => seq(
+    variant: $ => prec.right(seq(
       "|",
       field("name", $.identifier),
       optional(field("payload", $.type_expression)),
-    ),
+    )),
 
     type_alias_definition: $ => $.type_expression,
 
-    trait_statement: $ => seq(
-      "trait",
-      optional("~"),
-      field("name", $.identifier),
-      choice(
-        seq(
-          optional($.type_parameter_list),
-          "=",
-          repeat($.trait_method_declaration),
-          "end",
-        ),
-        seq(
-          "=",
-          field("alias", choice($.identifier, $.path)),
-        ),
+    trait_statement: $ => choice(
+      seq(
+        "trait",
+        "~",
+        field("name", $.identifier),
+        "=",
+        field("alias", choice($.identifier, $.path)),
+      ),
+      seq(
+        "trait",
+        field("name", $.identifier),
+        optional($.type_parameter_list),
+        "=",
+        repeat($.trait_method_declaration),
+        "end",
       ),
     ),
 
@@ -282,7 +308,7 @@ export default grammar({
 
     function_shorthand_expression: $ => prec.right(seq(
       "fn",
-      repeat1($.match_arm),
+      repeat1($.piped_match_arm),
     )),
 
     parameter: $ => choice(
@@ -309,15 +335,24 @@ export default grammar({
       "match",
       field("value", $.expression),
       "with",
-      repeat1($.match_arm),
+      choice(
+        seq($.unpiped_match_arm, repeat($.piped_match_arm)),
+        repeat1($.piped_match_arm),
+      ),
     )),
 
-    match_arm: $ => seq(
+    piped_match_arm: $ => alias(seq(
       "|",
       field("pattern", $.pattern),
       "=>",
       field("body", $.expression),
-    ),
+    ), $.match_arm),
+
+    unpiped_match_arm: $ => alias(seq(
+      field("pattern", $.pattern),
+      "=>",
+      field("body", $.expression),
+    ), $.match_arm),
 
     inline_wasm_expression: $ => seq(
       "(",
@@ -424,11 +459,10 @@ export default grammar({
       $.struct_pattern,
     ),
 
-    constructor_pattern: $ => seq(
+    constructor_pattern: $ => prec.right(PREC.CONSTRUCTOR_PATTERN, seq(
       field("constructor", choice($.path, $.identifier)),
-      "of",
       field("payload", $.pattern),
-    ),
+    )),
 
     unit_pattern: _ => "()",
 
@@ -477,9 +511,9 @@ export default grammar({
 
     sexpr_path: $ => seq(
       "$",
-      field("module", $.sexpr_identifier),
+      field("module", $.word_identifier),
       "::",
-      field("name", $.sexpr_identifier),
+      field("name", $.word_identifier),
     ),
 
     sexpr_symbol_identifier: $ => seq("$", $.sexpr_identifier),
@@ -504,6 +538,11 @@ export default grammar({
       choice(
         seq(
           "root",
+          "::",
+          repeat(seq(field("module", $.identifier), "::")),
+        ),
+        seq(
+          "bundle",
           "::",
           repeat(seq(field("module", $.identifier), "::")),
         ),
@@ -545,6 +584,7 @@ export default grammar({
     word_identifier: _ => token(/[A-Za-z_][A-Za-z0-9_]*(?:-[A-Za-z0-9_]+)*/),
     sexpr_identifier: $ => choice(
       alias($.word_identifier, $.sexpr_identifier),
+      alias("-", $.sexpr_identifier),
       alias("module", $.sexpr_identifier),
       alias("import", $.sexpr_identifier),
       alias("use", $.sexpr_identifier),
@@ -568,7 +608,6 @@ export default grammar({
       alias("not", $.sexpr_identifier),
       alias("fn", $.sexpr_identifier),
       alias("wasm", $.sexpr_identifier),
-      alias("for", $.sexpr_identifier),
       alias("root", $.sexpr_identifier),
     ),
 

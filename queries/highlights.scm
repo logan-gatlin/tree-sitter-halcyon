@@ -19,7 +19,6 @@
   "match"
   "with"
   "in"
-  "of"
   "end"
 ] @keyword
 
@@ -263,49 +262,6 @@
   name: (identifier
     (operator_identifier) @variable.parameter))
 
-(function_shorthand_expression
-  (match_arm
-    pattern: (identifier) @variable.parameter))
-
-(function_shorthand_expression
-  (match_arm
-    pattern: (typed_pattern
-      pattern: (identifier) @variable.parameter)))
-
-(function_shorthand_expression
-  (match_arm
-    pattern: (constructor_pattern
-      payload: (identifier) @variable.parameter)))
-
-(function_shorthand_expression
-  (match_arm
-    pattern: (tuple_pattern
-      (identifier) @variable.parameter)))
-
-(function_shorthand_expression
-  (match_arm
-    pattern: (array_pattern
-      (identifier) @variable.parameter)))
-
-(function_shorthand_expression
-  (match_arm
-    pattern: (array_pattern
-      (rest_pattern
-        (identifier) @variable.parameter))))
-
-(function_shorthand_expression
-  (match_arm
-    pattern: (struct_pattern
-      (pattern_field
-        name: (identifier) @variable.parameter
-        !value))))
-
-(function_shorthand_expression
-  (match_arm
-    pattern: (struct_pattern
-      (pattern_field
-        value: (identifier) @variable.parameter))))
-
 (field_type
   name: (identifier) @property)
 
@@ -315,34 +271,4 @@
 (pattern_field
   name: (identifier) @property)
 
-(sexpr_path
-  module: (sexpr_identifier) @namespace)
-
-(sexpr_path
-  name: (sexpr_identifier) @function)
-
-(sexpr_symbol_identifier) @variable.parameter
-
-(sexpr_symbol_identifier
-  (sexpr_identifier) @variable.parameter)
-
-(sexpr
-  (sexpr_identifier) @variable.parameter)
-
-(sexpr
-  (sexpr_field
-    object: (sexpr_identifier) @variable.parameter
-    field: (sexpr_identifier) @property))
-
-(sexpr
-  . (sexpr_identifier) @function)
-
-(sexpr
-  . (sexpr_field
-    object: (sexpr_identifier) @function
-    field: (sexpr_identifier) @function))
-
 (operator_identifier) @function
-
-(sexpr_field
-  field: (sexpr_identifier) @function)

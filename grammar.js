@@ -73,6 +73,7 @@ export default grammar({
     ),
 
     statement: $ => choice(
+      $.do_statement,
       $.use_statement,
       $.let_statement,
       $.type_statement,
@@ -82,11 +83,22 @@ export default grammar({
       $.module,
     ),
 
+    do_statement: $ => seq(
+      "do",
+      field("value", $.expression),
+    ),
+
     use_statement: $ => seq(
       "use",
-      field("target", choice($.identifier, $.path)),
+      field("target", choice(
+        alias($.bare_bundle_path, $.path),
+        $.path,
+        $.identifier,
+      )),
       optional(seq("as", field("alias", $.identifier))),
     ),
+
+    bare_bundle_path: _ => "bundle",
 
     let_statement: $ => choice(
       seq(
@@ -135,7 +147,7 @@ export default grammar({
 
     record_type_definition: $ => seq(
       "{",
-      repeat1(seq(choice($.field_type, $.spread_type), optional(","))),
+      repeat(seq(choice($.field_type, $.spread_type), optional(","))),
       "}",
     ),
 
@@ -170,9 +182,14 @@ export default grammar({
         field("name", $.identifier),
         optional($.type_parameter_list),
         "=",
-        repeat($.trait_method_declaration),
+        repeat($.trait_item_declaration),
         "end",
       ),
+    ),
+
+    trait_item_declaration: $ => choice(
+      $.trait_method_declaration,
+      $.trait_type_declaration,
     ),
 
     trait_method_declaration: $ => seq(
@@ -182,6 +199,11 @@ export default grammar({
       field("type", $.type_expression),
     ),
 
+    trait_type_declaration: $ => seq(
+      "type",
+      field("name", $.identifier),
+    ),
+
     impl_statement: $ => seq(
       "impl",
       field("trait", choice($.identifier, $.path)),
@@ -189,8 +211,13 @@ export default grammar({
       repeat(seq(",", field("argument", $.type_expression))),
       optional(","),
       "=",
-      repeat($.impl_method_definition),
+      repeat($.impl_item_definition),
       "end",
+    ),
+
+    impl_item_definition: $ => choice(
+      $.impl_method_definition,
+      $.impl_type_definition,
     ),
 
     impl_method_definition: $ => seq(
@@ -198,6 +225,13 @@ export default grammar({
       field("name", $.identifier),
       "=",
       field("value", $.expression),
+    ),
+
+    impl_type_definition: $ => seq(
+      "type",
+      field("name", $.identifier),
+      "=",
+      field("value", $.type_expression),
     ),
 
     wasm_statement: $ => seq(
@@ -257,8 +291,11 @@ export default grammar({
       "(",
       $.type_expression,
       ",",
-      commaSep1($.type_expression),
-      optional(","),
+      optional(seq(
+        $.type_expression,
+        repeat(seq(",", $.type_expression)),
+        optional(","),
+      )),
       ")",
     ),
 
@@ -288,7 +325,11 @@ export default grammar({
 
     use_expression: $ => seq(
       "use",
-      field("target", choice($.identifier, $.path)),
+      field("target", choice(
+        alias($.bare_bundle_path, $.path),
+        $.path,
+        $.identifier,
+      )),
       optional(seq("as", field("alias", $.identifier))),
       "in",
       field("body", $.expression),
@@ -382,13 +423,13 @@ export default grammar({
 
     binary_expression: $ => choice(
       prec.left(PREC.SEMICOLON, seq($.expression, ";", $.expression)),
-      prec.left(PREC.PIPE, seq($.expression, "|>", $.expression)),
+      prec.left(PREC.PIPE, seq($.expression, choice("|>", "+>", "*>"), $.expression)),
       prec.left(PREC.OR, seq($.expression, "or", $.expression)),
       prec.left(PREC.AND, seq($.expression, "and", $.expression)),
       prec.left(PREC.COMPARE, seq($.expression, choice("==", "!=", "<", "<=", ">", ">="), $.expression)),
       prec.left(PREC.COMPOSE, seq($.expression, choice("<<", ">>", "xor"), $.expression)),
       prec.left(PREC.ADD, seq($.expression, choice("+", "-"), $.expression)),
-      prec.left(PREC.MULTIPLY, seq($.expression, choice("*", "/", "%"), $.expression)),
+      prec.left(PREC.MULTIPLY, seq($.expression, choice("*", "/", "mod"), $.expression)),
     ),
 
     _atom: $ => choice(
@@ -409,8 +450,11 @@ export default grammar({
       "(",
       $.expression,
       ",",
-      commaSep1($.expression),
-      optional(","),
+      optional(seq(
+        $.expression,
+        repeat(seq(",", $.expression)),
+        optional(","),
+      )),
       ")",
     ),
 
@@ -426,15 +470,16 @@ export default grammar({
 
     struct_expression: $ => seq(
       "{",
-      commaSep($.struct_field),
-      optional(","),
+      repeat(seq($.struct_field, optional(","))),
       "}",
     ),
 
     struct_field: $ => seq(
       field("name", $.identifier),
-      choice("=", ":"),
-      field("value", $.expression),
+      optional(seq(
+        choice("=", ":"),
+        field("value", $.expression),
+      )),
     ),
 
     pattern: $ => choice(
@@ -469,9 +514,14 @@ export default grammar({
     tuple_pattern: $ => seq(
       "(",
       $.pattern,
-      ",",
-      commaSep1($.pattern),
-      optional(","),
+      optional(seq(
+        ",",
+        optional(seq(
+          $.pattern,
+          repeat(seq(",", $.pattern)),
+          optional(","),
+        )),
+      )),
       ")",
     ),
 
@@ -481,12 +531,11 @@ export default grammar({
       "]",
     ),
 
-    rest_pattern: $ => prec.right(seq("..", optional(alias($.word_identifier, $.identifier)))),
+    rest_pattern: $ => prec.right(seq("..", optional($.identifier))),
 
     struct_pattern: $ => seq(
       "{",
-      commaSep($.pattern_field),
-      optional(","),
+      repeat(seq($.pattern_field, optional(","))),
       "}",
     ),
 
@@ -525,6 +574,7 @@ export default grammar({
     ),
 
     literal: $ => choice(
+      $.natural_literal,
       $.integer_literal,
       $.real_literal,
       $.string_literal,
@@ -563,8 +613,10 @@ export default grammar({
       "-",
       "*",
       "/",
-      "%",
+      "mod",
       "|>",
+      "+>",
+      "*>",
       "<<",
       ">>",
       "==",
@@ -611,6 +663,14 @@ export default grammar({
       alias("root", $.sexpr_identifier),
     ),
 
+    natural_literal: _ => token(choice(
+      /0[xX][0-9a-fA-F](?:_?[0-9a-fA-F])*n/,
+      /0[oO][0-7](?:_?[0-7])*n/,
+      /0[bB][01](?:_?[01])*n/,
+      /0[dD][0-9](?:_?[0-9])*n/,
+      /[0-9](?:_?[0-9])*n/,
+    )),
+
     integer_literal: _ => token(choice(
       /0[xX][0-9a-fA-F](?:_?[0-9a-fA-F])*/,
       /0[oO][0-7](?:_?[0-7])*/,
@@ -620,15 +680,15 @@ export default grammar({
     )),
 
     real_literal: _ => token(choice(
-      /[0-9](?:_?[0-9])*\.[0-9](?:_?[0-9])*(?:[eE][+-]?[0-9](?:_?[0-9])*)?/,
-      /[0-9](?:_?[0-9])*(?:[eE][+-]?[0-9](?:_?[0-9])*)/,
+      /[0-9](?:_?[0-9])*\.[0-9](?:_?[0-9])*(?:e[+-]?[0-9](?:_?[0-9])*)?/,
+      /[0-9](?:_?[0-9])*(?:e[+-]?[0-9](?:_?[0-9])*)/,
     )),
 
     string_literal: _ => token(seq('"', repeat(choice(/[^"\\]/, /\\./)), '"')),
     glyph_literal: _ => token(seq("'", repeat(choice(/[^'\\]/, /\\./)), "'")),
 
     line_comment: _ => token(seq("--", /[^\n]*/)),
-    block_comment: _ => token(seq("(*", /[^*]*\*+([^(*][^*]*\*+)*/, ")")),
+    block_comment: _ => token(seq("(*", /[^*]*\*+([^)*][^*]*\*+)*/, ")")),
   },
 });
 

@@ -1,7 +1,10 @@
 (module) @local.scope
 (function_long_expression) @local.scope
 (function_shorthand_expression) @local.scope
-(match_arm) @local.scope
+[
+  (piped_match_arm)
+  (unpiped_match_arm)
+] @local.scope
 
 (let_expression
   body: (_) @local.scope)
@@ -42,8 +45,15 @@
 (pattern_field
   value: (identifier) @local.definition.variable)
 
-(match_arm
-  pattern: (identifier) @local.definition.variable)
+[
+  (piped_match_arm
+    pattern: (match_arm
+      (identifier) @local.definition.variable))
+
+  (unpiped_match_arm
+    pattern: (match_arm
+      (identifier) @local.definition.variable))
+]
 
 (tuple_pattern
   (identifier) @local.definition.variable)

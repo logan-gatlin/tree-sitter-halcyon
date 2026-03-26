@@ -8,6 +8,7 @@
   "type"
   "trait"
   "impl"
+  "do"
   "wasm"
   "for"
   "where"
@@ -30,8 +31,10 @@
   "-"
   "*"
   "/"
-  "%"
+  "mod"
   "|>"
+  "+>"
+  "*>"
   "<<"
   ">>"
   "=="
@@ -68,6 +71,7 @@
 
 (string_literal) @string
 (glyph_literal) @string.special
+(natural_literal) @number
 (integer_literal) @number
 (real_literal) @number.float
 (boolean_literal) @boolean
